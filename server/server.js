@@ -13,7 +13,10 @@ const server = http.createServer(app);
 
 // Initialize socket.io server
 export const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: { 
+    origin: process.env.FRONTEND_URL || "*",
+    credentials: true
+  },
 });
 
 // Store online users
@@ -38,7 +41,10 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: "4mb" }));
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*",
+  credentials: true
+}));
 
 // Routes setup
 app.get("/", (req, res) => {
