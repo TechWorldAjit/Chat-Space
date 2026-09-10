@@ -3,7 +3,11 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ||
+  (import.meta.env.MODE === "production"
+    ? "https://chat-space-eight.vercel.app"
+    : "http://localhost:5001");
 axios.defaults.baseURL = backendUrl;
 
 export const AuthContext = createContext();
@@ -24,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         connectSocket(data.user);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.warn("Auth check failed:", error.response?.data?.message || error.message);
     }
   };
 
@@ -44,7 +48,7 @@ export const AuthProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
