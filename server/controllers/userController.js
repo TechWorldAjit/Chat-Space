@@ -15,6 +15,10 @@ export const signup = async (req, res) => {
       return res.json({ success: false, message: "Missing Details" });
     }
 
+    if (email.toLowerCase() === "spaceai@system.local" || fullName.toLowerCase() === "spaceai") {
+      return res.json({ success: false, message: "Cannot register as system user" });
+    }
+
     const user = await User.findOne({ email });
 
     if (user) {
@@ -52,6 +56,11 @@ export const login = async (req, res) => {
     await connectDB();
 
     const { email, password } = req.body;
+
+    if (email.toLowerCase() === "spaceai@system.local") {
+      return res.json({ success: false, message: "System account cannot be logged into directly" });
+    }
+
     const userData = await User.findOne({ email });
 
     if (!userData) {

@@ -12,7 +12,7 @@ const App = () => {
 
   return (
     <div
-      className="bg-contain"
+      className="bg-cover bg-center min-h-screen w-full h-screen overflow-hidden"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       <Toaster />

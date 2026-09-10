@@ -1,36 +1,54 @@
 import mongoose from "mongoose";
 import "dotenv/config";
 
-mongoose.set("bufferCommands", false);
+let isConnecting = null;
+let fallbackMongod = null;
 
 // Function to connect to the mongodb database
 export const connectDB = async () => {
   if (mongoose.connection.readyState === 1) return;
-  if (mongoose.connection.readyState === 2) return;
+  if (isConnecting) return isConnecting;
 
   const mongoUri = process.env.MONGO_URI;
-  if (!mongoUri) {
-    throw new Error("MONGO_URI is not set in the environment");
-  }
 
-  try {
-    mongoose.connection.on("connected", () => console.log("Database Connected"));
-    mongoose.connection.on("error", (error) =>
-      console.error("MongoDB connection error:", error)
-    );
-    mongoose.connection.on("disconnected", () =>
-      console.warn("MongoDB disconnected")
-    );
+  isConnecting = (async () => {
+    try {
+      if (mongoUri) {
+        console.log("Connecting to MongoDB Atlas...");
+        await mongoose.connect(mongoUri, {
+          serverSelectionTimeoutMS: 5000,
+          socketTimeoutMS: 30000,
+          connectTimeoutMS: 5000,
+          retryWrites: true,
+        });
+        console.log("Database Connected to MongoDB Atlas");
+        return;
+      }
+    } catch (error) {
+      console.warn(
+        "MongoDB Atlas connection timed out (often due to Atlas IP whitelist). Initiating local dev fallback..."
+      );
+    }
 
-    await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      retryWrites: true,
-      maxPoolSize: 10,
+    // In-memory fallback for smooth local development
+    if (process.env.NODE_ENV !== "production" && mongoose.connection.readyState !== 1) {
+      try {
+        if (!fallbackMongod) {
+          const { MongoMemoryServer } = await import("mongodb-memory-server");
+          fallbackMongod = await MongoMemoryServer.create();
+        }
+        const uri = fallbackMongod.getUri();
+        await mongoose.connect(uri);
+        console.log("Database Connected to Local Development Database");
+      } catch (localErr) {
+        console.error("Local fallback DB failed:", localErr.message);
+        throw localErr;
+      }
+    }
+  })()
+    .finally(() => {
+      isConnecting = null;
     });
-  } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    throw error;
-  }
+
+  return isConnecting;
 };

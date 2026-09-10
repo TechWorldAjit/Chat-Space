@@ -5,46 +5,23 @@ import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
-import { Server } from "socket.io";
+import aiRouter from "./routes/aiRoutes.js";
+import groupRouter from "./routes/groupRoutes.js";
+import folderRouter from "./routes/folderRoutes.js";
+import { getOrCreateSpaceAIUser } from "./lib/spaceai.js";
+import { initSocket, io, userSocketMap } from "./lib/socket.js";
+export { io, userSocketMap };
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
 // Initialize socket.io server
-export const io = new Server(server, {
-  cors: { 
-    origin: process.env.FRONTEND_URL || "*",
-    credentials: true
-  },
-});
-
-// Store online users
-export const userSocketMap = {}; // { userId: socketId }
-
-// Socket.io connection handler
-io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
-  console.log("User Connected", userId);
-
-  if (userId) userSocketMap[userId] = socket.id;
-
-  // Emit online users to all connected clients
-  io.emit("getOnlineUsers", Object.keys(userSocketMap));
-
-  socket.on("disconnect", () => {
-    console.log("User Disconnected", userId);
-    delete userSocketMap[userId];
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
-  });
-});
+initSocket(server);
 
 // Middleware setup
 app.use(express.json({ limit: "4mb" }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
-  credentials: true
-}));
+app.use(cors());
 
 // Routes setup
 app.get("/", (req, res) => {
@@ -54,11 +31,15 @@ app.use("/api/status", (req, res) => res.send("Server is live"));
 
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/ai", aiRouter);
+app.use("/api/groups", groupRouter);
+app.use("/api/folders", folderRouter);
 
 // Connect to MongoDB in the background so the API can still start
 const initializeDatabase = async () => {
   try {
     await connectDB();
+    await getOrCreateSpaceAIUser();
   } catch (error) {
     console.warn("MongoDB unavailable at startup:", error.message);
   }
@@ -87,7 +68,7 @@ const startServer = (port) => {
   });
 };
 
-if (process.env.NODE_ENV !== "production") {
+if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT) || 5001;
   startServer(PORT);
 }
